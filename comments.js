@@ -1,66 +1,75 @@
-// Create web Server comments application
-// 1. create a web server
-// 2. read the comments.json file
-// 3. render the comments.json file to the client
-// 4. when the user posts a comment, add it to the comments.json file
-// 5. when the user posts a comment, redirect to the comments page
+// Create web server comments
+// 2019-03-16
+// ---------------------------------------------------------------------------
 
-var http = require('http');
-var fs = require('fs');
-var url = require('url');
-var querystring = require('querystring');
+// Import the express module
+const express = require('express');
 
-var comments = JSON.parse(fs.readFileSync('comments.json', 'utf8'));
+// Create the router
+const router = express.Router();
 
-function renderCommentList(comments) {
-  var list = [];
-  for (var i = 0; i < comments.length; i++) {
-    list.push('<li>' + comments[i] + '</li>');
-  }
-  return '<ul>' + list.join('') + '</ul>';
-}
+// Import the database module
+const db = require('../db');
 
-function renderCommentForm() {
-  return '<form method="POST" action="/comment">' +
-    '<input type="text" name="comment"/>' +
-    '<input type="submit" value="Submit"/>' +
-    '</form>';
-}
-
-function renderCommentPage(comments) {
-  return '<html><head><title>Comments</title></head><body>' +
-    renderCommentList(comments) + renderCommentForm() + '</body></html>';
-}
-
-function handleRequest(request, response) {
-  var parsedUrl = url.parse(request.url);
-  var path = parsedUrl.pathname;
-  var query = querystring.parse(parsedUrl.query);
-  var method = request.method;
-
-  if (path === '/') {
-    response.end('Hello, World!');
-  } else if (path === '/comment' && method === 'POST') {
-    var body = '';
-    request.on('data', function(chunk) {
-      body += chunk;
+// ---------------------------------------------------------------------------
+// GET
+// ---------------------------------------------------------------------------
+router.get('/', (req, res) => {
+    // Get all comments
+    db.query('SELECT * FROM comments', (err, results) => {
+        if (err) {
+            console.log(err);
+            res.sendStatus(500);
+        } else {
+            res.send(results);
+        }
     });
-    request.on('end', function() {
-      var newComment = querystring.parse(body).comment;
-      comments.push(newComment);
-      fs.writeFileSync('comments.json', JSON.stringify(comments));
-      response.writeHead(303, {
-        'Location': '/comments'
-      });
-      response.end();
-    });
-  } else if (path === '/comments') {
-    response.end(renderCommentPage(comments));
-  } else {
-    response.writeHead(404);
-    response.end('Not Found');
-  }
-}
+});
 
-var server = http.createServer(handleRequest);
-server.listen(3000);
+// ---------------------------------------------------------------------------
+// POST
+// ---------------------------------------------------------------------------
+router.post('/', (req, res) => {
+    // Create a new comment
+    db.query('INSERT INTO comments SET ?', req.body, (err, result) => {
+        if (err) {
+            console.log(err);
+            res.sendStatus(500);
+        } else {
+            res.status(201).send(req.body);
+        }
+    });
+});
+
+// ---------------------------------------------------------------------------
+// PUT
+// ---------------------------------------------------------------------------
+router.put('/:id', (req, res) => {
+    // Update a comment
+    db.query('UPDATE comments SET ? WHERE id = ?', [req.body, req.params.id], (err, result) => {
+        if (err) {
+            console.log(err);
+            res.sendStatus(500);
+        } else {
+            res.sendStatus(200);
+        }
+    });
+});
+
+// ---------------------------------------------------------------------------
+// DELETE
+// ---------------------------------------------------------------------------
+router.delete('/:id', (req, res) => {
+    // Delete a comment
+    db.query('DELETE FROM comments WHERE id = ?', req.params.id, (err, result) => {
+        if (err) {
+            console.log(err);
+            res.sendStatus(500);
+        } else {
+            res.sendStatus(200);
+        }
+    });
+});
+
+// Export the router
+module.exports = router;
